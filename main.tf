@@ -9,6 +9,13 @@ variable "server_port" {
     default     = 8080
 }
 
+# Output variables 
+output "public_ip" {
+    description = "The public IP address of the web server"
+    value       = aws_instance.example.public_ip
+}
+
+
 resource "aws_security_group" "instance" {
     name = "terraform-example-instance"
     ingress {
