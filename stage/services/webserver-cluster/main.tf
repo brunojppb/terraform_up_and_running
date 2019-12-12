@@ -2,25 +2,29 @@ provider "aws" {
     region = "eu-central-1"
 }
 
-# Input variables
-variable "server_port" {
-    description = "The port the web server will be listening to HTTP calls"
-    type        = number
-    default     = 8080
-}
-
-output "alb_dns_name" {
-    value = aws_lb.example.dns_name
-    description = "The domain name of the load balancer"
-}
-
 # Data sources
+# Read-only information from AWS
 data "aws_vpc" "default" {
     default = true
 }
 
 data "aws_subnet_ids" "default" {
     vpc_id = data.aws_vpc.default.id
+}
+
+# Copy 1-to-1 from S3 global configuration
+# only bucket key is changed to reflect folder structure
+terraform {
+  backend "s3" {
+    bucket  = "terraform-up-and-running-state-bruno"
+    key     = "stage/services/webserver-cluster/terraform.tfstate"
+    region  = "eu-central-1"
+
+    # DynamoDB table for locking
+    # This resource is declared down there
+    dynamodb_table  = "terraform-up-and-running-locks"
+    encrypt         = true
+  }
 }
 
 
