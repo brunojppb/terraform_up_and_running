@@ -32,7 +32,7 @@ resource "aws_security_group" "instance" {
         from_port   = var.server_port
         to_port     = var.server_port
         protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
+        cidr_blocks = ["0.0.0.0/0"] # Allow any IP Address range
     }
 }
 
@@ -49,8 +49,9 @@ resource "aws_launch_configuration" "example" {
                 nohup busybox httpd -f -p ${var.server_port} &
                 EOF
 
-    # this is necessary when using a launch configuration with an autoscaling group
-    # see: 
+    # this is necessary when using a launch configuration with an autoscaling group.
+    # When changing a auto-scaling group, a whole new one must be created and the old one must be destroyed
+    # It will make sure to create a new auto-scaling group before destroying the old one
     lifecycle {
         create_before_destroy = true
     }
@@ -64,14 +65,13 @@ resource "aws_autoscaling_group" "example" {
     launch_configuration = aws_launch_configuration.example.name
     vpc_zone_identifier  = data.aws_subnet_ids.default.ids
 
-    # tells the autoscaling group to which instances it should
-    # redirect traffic.
+    # tells the autoscaling group to which instances it should redirect traffic.
     target_group_arns = [aws_lb_target_group.asg.arn]
     # It also uses the target group health checks instead of the VM (default EC2)
     health_check_type = "ELB"
 
-    min_size = 2
-    max_size = 10
+    min_size = 2 # at least 2 EC2 instances will be running at any given time
+    max_size = 10 # we can scale out up to 10 instances
 
     tag {
         key                 = "Name"
@@ -80,8 +80,7 @@ resource "aws_autoscaling_group" "example" {
     }
 }
 
-# Now lets put a load balancer in front of those EC2 instances provided
-# by the autoscaling group
+# Now lets put a load balancer in front of those EC2 instances provided by the autoscaling group
 resource "aws_lb" "example" {
     name                = "terraform-asg-example"
     load_balancer_type  = "application"
