@@ -3,13 +3,27 @@ provider "aws" {
 }
 
 # Data sources
-# Read-only information from AWS
+# Read-only information from AWS and Terraform state files
 data "aws_vpc" "default" {
     default = true
 }
 
 data "aws_subnet_ids" "default" {
     vpc_id = data.aws_vpc.default.id
+}
+
+# Read data directly from our S3 Bucket backend store
+# This is read-only information from a previously created resource
+# the output varibles from the DB module will be available under "db.outputs"
+data "terraform_remote_state" "db" {
+    backend = "s3"
+
+    config = {
+        bucket = "terraform-up-and-running-state-bruno"
+        key = "stage/data-stores/mysql/terraform.tfstate"
+        region = "eu-central-1"
+    }
+
 }
 
 # Copy 1-to-1 from S3 global configuration
@@ -40,6 +54,18 @@ resource "aws_security_group" "instance" {
     }
 }
 
+# Executable script rendered by Terraform
+# to boot up our fake web app
+data "template_file" "user_data" {
+    template = file("user-data.sh")
+
+    vars = {
+        server_port = var.server_port
+        db_address  = data.terraform_remote_state.db.outputs.address
+        db_port     = data.terraform_remote_state.db.outputs.port 
+    }
+}
+
 # Launch configuration setup for how the autoscaling group
 # should be, like the EC2 instances to be used, which scripts to fire up during startup and so on
 resource "aws_launch_configuration" "example" {
@@ -47,11 +73,8 @@ resource "aws_launch_configuration" "example" {
     instance_type           = "t2.micro"
     security_groups         = [aws_security_group.instance.id]
     
-    user_data = <<-EOF
-                #!/bin/bash
-                echo "hello, world" > index.html
-                nohup busybox httpd -f -p ${var.server_port} &
-                EOF
+    # 'rendered' property will make sure the script is rendered with variables applied
+    user_data = data.template_file.user_data.rendered
 
     # this is necessary when using a launch configuration with an autoscaling group.
     # When changing a auto-scaling group, a whole new one must be created and the old one must be destroyed
