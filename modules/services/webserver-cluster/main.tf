@@ -19,9 +19,9 @@ data "terraform_remote_state" "db" {
     backend = "s3"
 
     config = {
-        bucket = "terraform-up-and-running-state-bruno"
-        key = "stage/data-stores/mysql/terraform.tfstate"
-        region = "eu-central-1"
+        bucket  = var.db_remote_state_bucket
+        key     = var.db_remote_state_key
+        region  = "eu-central-1"
     }
 
 }
@@ -45,7 +45,7 @@ terraform {
 # Security group helps us to make available on the internet
 # only the resources we need. that helps us to reduce the user surface and security risks
 resource "aws_security_group" "instance" {
-    name = "terraform-example-instance"
+    name = "${var.cluster_name}security-group-instance"
     ingress {
         from_port   = var.server_port
         to_port     = var.server_port
@@ -109,7 +109,7 @@ resource "aws_autoscaling_group" "example" {
 
 # Now lets put a load balancer in front of those EC2 instances provided by the autoscaling group
 resource "aws_lb" "example" {
-    name                = "terraform-asg-example"
+    name                = "${var.cluster_name}-asg"
     load_balancer_type  = "application"
     subnets             = data.aws_subnet_ids.default.ids
     security_groups     = [aws_security_group.alb.id]
@@ -136,7 +136,7 @@ resource "aws_lb_listener" "http" {
 
 # This security group let our Load Balancer accept incoming traffic from the internet
 resource "aws_security_group" "alb" {
-    name = "terraform-example-alb"
+    name = "${var.cluster_name}-alb"
 
     # Allow inbound HTTP requests
     ingress {
@@ -157,7 +157,7 @@ resource "aws_security_group" "alb" {
 
 # TODO: Whata hell is a target group?
 resource "aws_lb_target_group" "asg" {
-    name     = "terraform-asg-example"
+    name     = "${var.cluster_name}-asg"
     port     = var.server_port
     protocol = "HTTP"
     vpc_id   = data.aws_vpc.default.id
