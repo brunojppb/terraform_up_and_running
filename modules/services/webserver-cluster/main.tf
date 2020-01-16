@@ -1,7 +1,3 @@
-provider "aws" {
-    region = "eu-central-1"
-}
-
 # Data sources
 # Read-only information from AWS and Terraform state files
 data "aws_vpc" "default" {
@@ -25,22 +21,6 @@ data "terraform_remote_state" "db" {
     }
 
 }
-
-# Copy 1-to-1 from S3 global configuration
-# only bucket key is changed to reflect folder structure
-terraform {
-  backend "s3" {
-    bucket  = "terraform-up-and-running-state-bruno"
-    key     = "stage/services/webserver-cluster/terraform.tfstate"
-    region  = "eu-central-1"
-
-    # DynamoDB table for locking
-    # This resource is declared down there
-    dynamodb_table  = "terraform-up-and-running-locks"
-    encrypt         = true
-  }
-}
-
 
 # Security group helps us to make available on the internet
 # only the resources we need. that helps us to reduce the user surface and security risks
@@ -102,7 +82,7 @@ resource "aws_autoscaling_group" "example" {
 
     tag {
         key                 = "Name"
-        value               = "terraform-asg-example"
+        value               = "${var.cluster_name}-terraform-asg-example"
         propagate_at_launch = true
     }
 }
